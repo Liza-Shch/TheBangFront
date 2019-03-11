@@ -56,9 +56,9 @@
 
 .content {
   display: flex;
+  flex-direction: column;
   padding: 80px 40px 40px 40px;
-  justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
   background-color: #215077;
   opacity: 0.8;
@@ -257,6 +257,7 @@
   padding: 20px; }
 
 .liderboard {
+  width: 100%;
   margin-top: 20px;
   border: 5px #031633 solid;
   color: white;
@@ -311,6 +312,12 @@
     grid-area: password; }
   .grid__button {
     grid-area: button; }
+
+.notfound-icon {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  color: yellow; }
 
 html, body {
   margin: 0;
