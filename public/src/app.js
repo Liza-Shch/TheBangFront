@@ -1,46 +1,90 @@
-import '../css/style.scss';
+import 'css/style.scss';
+import 'src/service-worker';
 
-import AuthPage from "./controllers/AuthPage";
-import ProfilePage from "./controllers/ProfilePage";
-import HomePage from "./controllers/HomePage";
-import NotFoundPage from "./controllers/NotFoundPage";
-import SignUpPage from "./controllers/SignUpPage";
-import AuthorsPage from "./controllers/AuthorsPage";
-import GamePage from "./controllers/GamePage";
-import LeadersPage from "./controllers/LeadersPage";
-import Router from "./Router";
+import * as View from 'src/views';
+
+import Router from 'src/Router';
+import Store from 'src/Store';
+
+import EventBus from 'src/events/EventBus';
+import NetworkEvents from 'src/events/NetworkEvents';
+import Network from 'src/network/Network';
+import PageEvents from 'src/events/PageEvents';
+import PermissionController from 'src/permission/PermissionController';
+import Permission from 'src/permission/Permission';
 
 
-const app = document.getElementById('root');
+EventBus.on(PageEvents.UPDATE_STORE, Store.onUpdateUser.bind(Store));
+EventBus.on(PageEvents.BASE_COMPONENTS_RENDER, View.BasePage.onRender);
 
-let router = new Router();
+EventBus.on(NetworkEvents.GET_USER, Network.onGetUser);
+EventBus.on(PageEvents.LOAD_PAGE, onPageLoad);
 
-router.addUrl('/', HomePage, 'index');
-router.addUrl('/profile', ProfilePage, 'profile');
-router.addUrl('/auth', AuthPage, 'auth');
-router.addUrl('/signup', SignUpPage, 'signup');
-router.addUrl('/authors', AuthorsPage, 'authors');
-router.addUrl('/game', GamePage, 'game');
-router.addUrl('/leaders', LeadersPage, 'leaders');
+EventBus.on(NetworkEvents.SIGNUP, Network.onSignUpUser);
+EventBus.on(PageEvents.SIGNUP_SUCCESS, View.SignUpPage.onSuccess);
+EventBus.on(PageEvents.SIGNUP_ERROR, View.SignUpPage.onError);
 
-router.addUrl('404', NotFoundPage, 'not_found');
+EventBus.on(NetworkEvents.LOGIN, Network.onLoginUser);
+EventBus.on(PageEvents.LOGIN_SUCCESS, View.LoginPage.onSuccess);
+EventBus.on(PageEvents.LOGIN_ERROR, View.LoginPage.onError);
 
-function pageLoader () {
-    let url = location.hash.slice(1) || '/';
-    let controller = router.getController(url);
+EventBus.on(NetworkEvents.UPDATE_PROFILE, Network.onUpdateUser);
+EventBus.on(PageEvents.UPDATE_PROFILE_SUCCESS, View.ProfilePage.onSuccess);
+EventBus.on(PageEvents.UPDATE_PROFILE_ERROR, View.ProfilePage.onError);
 
-    controller = new controller();
-    let element = controller.getTargetRender();
+EventBus.on(NetworkEvents.LOGOUT, Network.onLogoutUser);
+EventBus.on(PageEvents.LOGOUT_SUCCESS, View.HomePage.onSuccess);
 
-    element.innerHTML = controller.render();
+EventBus.on(NetworkEvents.GET_LEADERBOARD, Network.onGetLeaderboard);
+EventBus.on(PageEvents.GET_LEADERBOARD_SUCCESS, View.LeadersPage.onSuccess);
+EventBus.on(PageEvents.GET_LEADERBOARD_ERROR, View.LeadersPage.onError);
 
-    if (controller.afterRender) {
-        controller.afterRender()
-    }
 
+const router = new Router();
+
+router.addUrl('/', View.HomePage, 'index');
+router.addUrl('/profile', View.ProfilePage, 'profile', Permission.LOGIN_REQUIRED);
+router.addUrl('/auth', View.LoginPage, 'auth', Permission.ANONYMOUS);
+router.addUrl('/signup', View.SignUpPage, 'signup', Permission.ANONYMOUS);
+router.addUrl('/authors', View.AuthorsPage, 'authors');
+router.addUrl('/game', View.GamePage, 'game', Permission.LOGIN_REQUIRED);
+router.addUrl('/leaders', View.LeadersPage, 'leaders', Permission.LOGIN_REQUIRED);
+
+router.addUrl('/not_found', View.NotFoundPage, 'not_found');
+router.addUrl('/unauthorized', View.UnAuthorizedPage, 'unauthorized');
+
+/**
+ * Подгрузка view для каждой страницы при переходе по url
+ */
+function onPageLoad() {
+	const url = location.hash.slice(1) || '/';
+	let controller = router.getController(url);
+
+	controller = new controller();
+
+	if (!PermissionController.checkConstraint(controller)) {
+		return
+	}
+
+	if (!controller.getTargetRender()) {
+		EventBus.emit(PageEvents.BASE_COMPONENTS_RENDER);
+	}
+
+	const element = controller.getTargetRender();
+
+	element.innerHTML = controller.render();
+
+	controller.afterRender()
 }
 
-window.addEventListener('hashchange', pageLoader);
-window.addEventListener('load', pageLoader);
+/**
+ * Первичная загрузка страницы, получаение данных о пользователе
+ */
+function firstLoad() {
+	EventBus.emit(NetworkEvents.GET_USER);
+}
 
-export default app;
+
+window.addEventListener('hashchange', onPageLoad);
+window.addEventListener('DOMContentLoaded', firstLoad);
+
